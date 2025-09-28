@@ -2,14 +2,20 @@
 
 A learning project demonstrating integration between Azure AI Foundry models/agents, MCP (Model Context Protocol) servers, and Microsoft Teams bots using preview and beta versions of various SDKs.
 
+Please see my LinkedIn posts for more info:  
+https://www.linkedin.com/feed/update/urn:li:activity:7365798255726579714/  
+https://www.linkedin.com/feed/update/urn:li:activity:7378160986584670208/  
+
 ## Overview
 
-This project showcases five different AI interaction approaches:
+This project showcases seven different AI interaction approaches:
 - **Base Model** - Azure AI Foundry model with full conversation history
-- **Goldfish Model** - Azure AI Foundry model with no memory 
+- **Goldfish Model** - Azure AI Foundry model with no memory
 - **Claude Code** - Local Claude Code with local Enphase MCP Server (stdio transport)
 - **Azure Agent** - Azure AI Foundry Agent without MCP tools
 - **MCP Agent** - Azure AI Foundry Agent with Enphase MCP Server access (HTTP transport via ngrok)
+- **Local Foundry** - Local Azure AI Foundry model with full conversation history
+- **Local Foundry Goldfish** - Local Azure AI Foundry model with no memory
 
 The Teams Bot serves as a unified interface to interact with all these AI variants through simple command prefixes.
 
@@ -18,17 +24,23 @@ The Teams Bot serves as a unified interface to interact with all these AI varian
 ### Quote.Agent (Main Teams Bot)
 - **Program.cs** - ASP.NET Core startup configuration with Teams middleware
 - **MainController.cs** - Teams bot controller handling message routing and AI integrations
-- Supports all five AI interaction modes with proper resource cleanup using the Dispose pattern
+- Supports all seven AI interaction modes with proper resource cleanup using the Dispose pattern
 
 ### TestMcpAgent (Standalone Console App)
 - **Program.cs** - Demonstrates Azure AI Foundry Agent with MCP Server integration
 - Two-part conversation example for testing agent functionality
 - Comprehensive error handling and resource cleanup
 
+### TestLocalFoundryModel (Standalone Console App)
+- **Program.cs** - Demonstrates Azure AI Foundry Local model integration
+- Shows local model startup, inference, and management
+- Uses phi-4-mini model for hardware compatibility
+
 ## Key Features Demonstrated
 
 ### Azure AI Foundry Integration
 - Base model chat with conversation history
+- Local model integration using Azure AI Foundry Local
 - Agent creation and management
 - Thread and message handling
 - Asynchronous operations with proper polling
@@ -54,9 +66,11 @@ The Teams Bot serves as a unified interface to interact with all these AI varian
 
 ## Prerequisites
 
-- .NET 9.0
+- .NET 9.0 (Quote.Agent, TestMcpAgent)
+- .NET 10.0 (TestLocalFoundryModel)
 - Azure CLI (`az login` required)
 - Azure AI Foundry project with deployed model
+- Azure AI Foundry Local (for local model support)
 - Enphase MCP Server running locally
 - ngrok for exposing local MCP server to Azure (for HTTP transport)
 - Microsoft Teams for bot testing
@@ -85,8 +99,12 @@ Start your message with one of these prefixes:
 - `claude` - Use local Claude Code with Enphase MCP
 - `agent` - Use Azure AI Foundry Agent
 - `mcp` - Use Azure Agent with MCP Server access
+- `localfoundry` - Use local Azure AI Foundry model (full conversation history)
+- `localfoundry-goldfish` - Use local Azure AI Foundry model (no memory)
 
-**Example:** `mcp When did I first generate 200W yesterday?`
+**Examples:**
+- `mcp When did I first generate 200W yesterday?`
+- `localfoundry What can you tell me about renewable energy?`
 
 ### Console App
 Run `TestMcpAgent.exe` for a standalone demonstration of:
@@ -94,6 +112,20 @@ Run `TestMcpAgent.exe` for a standalone demonstration of:
 2. Two-part conversation flow
 3. Tool approval handling
 4. Resource cleanup
+
+### LocalFoundry Setup
+
+If you wish to experiment with LocalFoundry:
+
+1. **Install LocalFoundry**: Follow Microsoft's [Getting Started with LocalFoundry](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-local/get-started) guide
+
+2. **Pre-download the model** (recommended before running ArchGuard):
+   ```
+   foundry model run qwen2.5-0.5b
+   ```
+   This downloads the model locally and can take significant time on first run. Running this command first prevents timeouts during ArchGuard startup.
+
+3. **Test your setup**: Use the LocalFoundry command-line chatbot or [AI Studio for VS Code](https://learn.microsoft.com/en-us/azure/ai-foundry/foundry-local/concepts/foundry-local-architecture) to directly chat with the model to test performance.
 
 ## Technical Insights
 
@@ -119,6 +151,7 @@ Run `TestMcpAgent.exe` for a standalone demonstration of:
 - Azure.AI.Agents.Persistent (1.2.0-beta.2)
 - Azure.AI.Inference (1.0.0-beta.5)
 - Azure.AI.Projects (1.0.0-beta.10)
+- Microsoft.AI.Foundry.Local (0.3.0)
 - Microsoft.Teams.* packages (2.0.0-preview.*)
 
 **Note:** These are preview/beta packages subject to breaking changes in future versions.
@@ -135,7 +168,7 @@ Run `TestMcpAgent.exe` for a standalone demonstration of:
 
 - JWT tokens for MCP server are short-lived and need manual updates
 - RequireApproval configuration for specific tools has serialization issues in current beta (GitHub issue #52213)
-- Resource initialization is synchronous for base models but asynchronous for agents
+- Resource initialization is synchronous for base models but asynchronous for agents and local foundry models
 
 
 ## Copyright and License

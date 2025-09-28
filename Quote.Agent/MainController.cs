@@ -1,9 +1,12 @@
-﻿using System.Diagnostics;
+﻿using System.ClientModel;
+using System.Diagnostics;
 
 using Azure;
 using Azure.AI.Agents.Persistent;
 using Azure.AI.OpenAI;
 using Azure.Identity;
+
+using Microsoft.AI.Foundry.Local;
 
 using Microsoft.Teams.Api.Activities;
 using Microsoft.Teams.Api.Messages;
@@ -11,6 +14,7 @@ using Microsoft.Teams.Apps;
 using Microsoft.Teams.Apps.Activities;
 using Microsoft.Teams.Apps.Annotations;
 
+using OpenAI;
 using OpenAI.Chat;
 
 namespace Quote.Agent;
@@ -21,6 +25,9 @@ public class MainController : IAsyncDisposable
     private ChatClient ChatClient { get; set; } = null!;
     private List<ChatMessage> MessagesForModel { get; set; } = null!;
     private bool AreAgentsInitialized { get; set; } = false;
+    private ChatClient LocalFoundryChatClient { get; set; } = null!;
+    private List<ChatMessage> MessagesForLocalFoundry { get; set; } = null!;
+    private bool IsLocalFoundryInitialized { get; set; } = false;
     private PersistentAgentsClient AgentClient { get; set; } = null!;
     private PersistentAgent Agent { get; set; } = null!;
     private PersistentAgent AgentWithMcp { get; set; } = null!;
@@ -72,6 +79,42 @@ public class MainController : IAsyncDisposable
         {
             new SystemChatMessage("You are a helpful assistant model."),
         };
+    }
+
+    private async Task InitializeLocalFoundryModelAsync()
+    {
+        try
+        {
+            var alias = "qwen2.5-0.5b"; // Hardware-dependent model selection
+            var manager = await FoundryLocalManager.StartModelAsync(aliasOrModelId: alias);
+            var model = await manager.GetModelInfoAsync(aliasOrModelId: alias);
+
+            ApiKeyCredential key = new ApiKeyCredential(manager.ApiKey);
+            OpenAIClient client = new OpenAIClient(key, new OpenAIClientOptions
+            {
+                Endpoint = manager.Endpoint
+            });
+
+            this.LocalFoundryChatClient = client.GetChatClient(model?.ModelId);
+
+            // Initialize conversation history for memory version
+            this.MessagesForLocalFoundry = new List<ChatMessage>()
+            {
+                //new SystemChatMessage("You are a Local Azure AI Foundry model."),
+            };
+
+            Console.WriteLine("Local Foundry model initialized successfully");
+        }
+        catch (Exception ex)
+        {
+            Console.ForegroundColor = ConsoleColor.Red;
+            Console.WriteLine($"Failed to initialize Local Foundry model: {ex.Message}");
+            Console.WriteLine("Local Foundry commands will not be available.");
+            Console.ResetColor();
+
+            // Set flag to disable local foundry commands
+            this.IsLocalFoundryInitialized = false;
+        }
     }
 
     private async Task InitializeAgentsAsync()
@@ -223,6 +266,18 @@ public class MainController : IAsyncDisposable
 
         var userMessage = activity.Text;
 
+        // Initialize local foundry if needed
+        if (this.IsLocalFoundryInitialized == false &&
+           (userMessage.StartsWith("localfoundry", StringComparison.OrdinalIgnoreCase)))
+        {
+            System.Console.WriteLine("");
+            System.Console.WriteLine("--------------------- initing local foundry -------------------------");
+            System.Console.WriteLine("");
+
+            await this.InitializeLocalFoundryModelAsync();
+            this.IsLocalFoundryInitialized = true;
+        }
+
         switch (true)
         {
             case var _ when userMessage.StartsWith("model", StringComparison.OrdinalIgnoreCase):
@@ -245,6 +300,14 @@ public class MainController : IAsyncDisposable
                 await this.HandleMcpRequestAsync(userMessage, client);
                 break;
 
+            case var _ when userMessage.StartsWith("localfoundry-goldfish", StringComparison.OrdinalIgnoreCase):
+                await this.HandleLocalFoundryGoldfishRequestAsync(userMessage, client);
+                break;
+
+            case var _ when userMessage.StartsWith("localfoundry", StringComparison.OrdinalIgnoreCase):
+                await this.HandleLocalFoundryRequestAsync(userMessage, client);
+                break;
+
             default:
                 await this.HelpResponseAsync(client);
                 break;
@@ -258,8 +321,10 @@ public class MainController : IAsyncDisposable
                        "🐠 **goldfish** - Chat against a base model (only last question -> no memory)\n" +
                        "🤖 **claude** - Local Claude Code + local Enphase data MCP Server (stdio) (no chat memory)\n" +
                        "☁️ **agent** - Azure AI Foundry (no Enphase knowledge)\n" +
-                       "🔧 **mcp** - Azure AI Foundry AI Agent + local Enphase data MCP Server (http via ngrok)\n\n" +
-                       "**Example:** `claude When did I first generate 200W yesterday?`";
+                       "🔧 **mcp** - Azure AI Foundry AI Agent + local Enphase data MCP Server (http via ngrok)\n" +
+                       "🏠 **localfoundry** - Local Azure AI Foundry model (full conversation history -> memory)\n" +
+                       "🏠🐠 **localfoundry-goldfish** - Local Azure AI Foundry model (only last question -> no memory)\n\n" +
+                       "**Example:** `localfoundry What can you tell me about renewable energy?`";
 
         await client.Send(helpText);
     }
@@ -363,10 +428,11 @@ public class MainController : IAsyncDisposable
         // Get the response back to the user.
 
         // The last message from the run is the agent's response.
-        PersistentThreadMessage message = await this.AgentClient.Messages.GetMessagesAsync(
+        var messages = await this.AgentClient.Messages.GetMessagesAsync(
             threadId: this.Thread.Id,
             order: ListSortOrder.Descending
-        ).FirstAsync();
+        ).ToListAsync();
+        PersistentThreadMessage message = messages.First();
 
         string responseText = string.Join("", message.ContentItems
             .OfType<MessageTextContent>()
@@ -400,10 +466,11 @@ public class MainController : IAsyncDisposable
         if (string.IsNullOrEmpty(errorString) is true)
         {
             // The last message from the run is the agent's response.
-            PersistentThreadMessage message = await this.AgentClient.Messages.GetMessagesAsync(
+            var messages = await this.AgentClient.Messages.GetMessagesAsync(
                 threadId: this.ThreadWithMcp.Id,
                 order: ListSortOrder.Descending
-            ).FirstAsync();
+            ).ToListAsync();
+            PersistentThreadMessage message = messages.First();
 
             string responseText = string.Join("", message.ContentItems
                 .OfType<MessageTextContent>()
@@ -417,6 +484,48 @@ public class MainController : IAsyncDisposable
         {
             await client.Send(errorString);
         }
+    }
+
+    private async Task HandleLocalFoundryRequestAsync(string userMessage, IContext.Client client)
+    {
+        if (this.IsLocalFoundryInitialized == false || this.LocalFoundryChatClient == null)
+        {
+            await client.Send("Local Foundry model is not available. Please check if Azure AI Foundry Local is installed and the model is accessible.");
+            return;
+        }
+
+        // Append new user question to conversation history
+        this.MessagesForLocalFoundry.Add(new UserChatMessage(userMessage));
+
+        var response = this.LocalFoundryChatClient.CompleteChat(this.MessagesForLocalFoundry);
+        var responseText = response.Value.Content[0].Text;
+
+        var activity = new MessageActivity(responseText).AddAIGenerated();
+        await client.Send(activity);
+
+        // Append the model response to the chat history
+        this.MessagesForLocalFoundry.Add(new AssistantChatMessage(responseText));
+    }
+
+    private async Task HandleLocalFoundryGoldfishRequestAsync(string userMessage, IContext.Client client)
+    {
+        if (this.IsLocalFoundryInitialized == false || this.LocalFoundryChatClient == null)
+        {
+            await client.Send("Local Foundry model is not available. Please check if Azure AI Foundry Local is installed and the model is accessible.");
+            return;
+        }
+
+        // Goldfish memory - reset messages rather than appending to them
+        List<ChatMessage> messages = new List<ChatMessage>()
+        {
+            new UserChatMessage(userMessage)
+        };
+
+        var response = this.LocalFoundryChatClient.CompleteChat(messages);
+        var responseText = response.Value.Content[0].Text;
+
+        var activity = new MessageActivity(responseText).AddAIGenerated();
+        await client.Send(activity);
     }
 
     private static async Task<string> HandleRunExecutionAndToolApprovalsAsync(ThreadRun run, PersistentAgentsClient agentClient, PersistentAgentThread thread)

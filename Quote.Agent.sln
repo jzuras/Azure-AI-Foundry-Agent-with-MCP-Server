@@ -1,6 +1,6 @@
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.14.36017.23
+# Visual Studio Version 18
+VisualStudioVersion = 18.0.11012.119 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Quote.Agent", "Quote.Agent\Quote.Agent.csproj", "{3DF7DBBF-6757-C96E-D6EC-3928332DA969}"
 EndProject
@@ -13,6 +13,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 	EndProjectSection
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestMcpAgent", "TestMcpAgent\TestMcpAgent.csproj", "{92ADEFF6-F7B8-469B-8C70-0FFAA44A56F3}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TestLocalFoundryModel", "TestLocalFoundryModel\TestLocalFoundryModel.csproj", "{E164E686-C126-4FB7-B6EF-EFFB6772ED92}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -34,6 +36,10 @@ Global
 		{92ADEFF6-F7B8-469B-8C70-0FFAA44A56F3}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{92ADEFF6-F7B8-469B-8C70-0FFAA44A56F3}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{92ADEFF6-F7B8-469B-8C70-0FFAA44A56F3}.Release|Any CPU.Build.0 = Release|Any CPU
+		{E164E686-C126-4FB7-B6EF-EFFB6772ED92}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{E164E686-C126-4FB7-B6EF-EFFB6772ED92}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{E164E686-C126-4FB7-B6EF-EFFB6772ED92}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{E164E686-C126-4FB7-B6EF-EFFB6772ED92}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
